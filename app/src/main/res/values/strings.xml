@@ -1,0 +1,13 @@
+<resources>
+    <!--
+      app_name ও admin_base_url এখন এই ফাইলে নেই — সেগুলো এখন
+      build.gradle থেকে Gradle property হিসেবে আসে (GitHub Actions
+      চালানোর সময় ফর্মে দিতে পারবেন)। তাই এই প্রজেক্ট দিয়ে চাইলে
+      একাধিক ভিন্ন অ্যাপ (ভিন্ন admin panel URL/নাম/রং) বানানো যায়,
+      কোনো কোড এডিট না করেই।
+    -->
+	 <string name="special_offer_long">বিশেষ অফার দেখুন</string>
+    <string name="special_offer_short">অফার</string>
+    <string name="track_order_long">আপনার অর্ডার ট্র্যাক করুন</string>
+    <string name="track_order_short">অর্ডার ট্র্যাক</string>
+</resources>

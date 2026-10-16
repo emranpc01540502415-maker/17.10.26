@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="offers"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutShortLabel="@string/special_offer_short"
+        android:shortcutLongLabel="@string/special_offer_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="@string/app_id"
+            android:targetClass="com.rinagift.app.MainActivity">
+            <extra android:name="shortcut_path" android:value="/offers" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="track_order"
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:shortcutShortLabel="@string/track_order_short"
+        android:shortcutLongLabel="@string/track_order_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="@string/app_id"
+            android:targetClass="com.rinagift.app.MainActivity">
+            <extra android:name="shortcut_path" android:value="/track-order" />
+        </intent>
+    </shortcut>
+</shortcuts>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "380285260245",
+    "project_id": "rina-gift-shop",
+    "storage_bucket": "rina-gift-shop.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:380285260245:android:5fd5e8610f4774ff8cad5c",
+        "android_client_info": {
+          "package_name": "com.rinagift.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPgUc6yqZTJwXPqEnwnuXL11pATWDMm8k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

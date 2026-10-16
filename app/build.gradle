@@ -1,0 +1,126 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// ================================================================
+// These values can be overridden without touching any source code —
+// either by editing gradle.properties, or by passing -P flags
+// (which is exactly what the GitHub Actions workflow does, using
+// the values you type into the "Run workflow" form). This lets you
+// build a DIFFERENT app (different admin panel URL, name, color,
+// package id) from this same project without editing any code.
+// ================================================================
+def cfgAdminBaseUrl   = project.findProperty('adminBaseUrl')    ?: 'https://rinagift.shop/amp'
+def cfgAppDisplayName = project.findProperty('appDisplayName')  ?: 'Rina Gift Shop'
+def cfgAppId          = project.findProperty('appId')           ?: 'com.rinagift.app'
+def cfgPrimaryColor   = project.findProperty('primaryColor')    ?: '#8B7FD6'
+def cfgPrimaryDark    = project.findProperty('primaryColorDark')?: '#6F62C9'
+def cfgVersionCode    = ((project.findProperty('appVersionCode') ?: '1') as String).toInteger()
+def cfgVersionName    = project.findProperty('appVersionName')  ?: '1.0'
+def cfgWebsiteHost    = project.findProperty('websiteHost')     ?: 'rinagift.shop'
+
+// ----------------------------------------------------------------
+// google-services.json হলো ঐচ্ছিক (Push Notification-এর জন্য)।
+// ফাইল আছে এবং তার ভেতরে এই build-এর applicationId (cfgAppId) মিলে গেলেই কেবল
+// Google Services plugin চালু হয়। মেলে না/ফাইল না থাকলে build ঠিকই সফল হয়
+// (plugin-এর "No matching client found for package name" error এড়াতে) —
+// শুধু Push Notification বন্ধ থাকে; বাকি সব ফিচার চলে। কারণ জানতে build log-এর ⚠️ লাইন দেখুন।
+// ----------------------------------------------------------------
+def gsFile = file('google-services.json')
+def gsPackageMatches = false
+if (gsFile.exists()) {
+    try {
+        def gsJson = new groovy.json.JsonSlurper().parse(gsFile)
+        gsPackageMatches = (gsJson.client ?: []).any { it?.client_info?.android_client_info?.package_name == cfgAppId }
+    } catch (Exception e) {
+        logger.warn("⚠️ google-services.json পড়া যায়নি (${e.message}) — Push Notification বন্ধ থাকবে।")
+    }
+    if (gsPackageMatches) {
+        apply plugin: 'com.google.gms.google-services'
+    } else {
+        logger.warn("⚠️ google-services.json-এ '${cfgAppId}' package পাওয়া যায়নি — Push Notification বন্ধ থাকবে। " +
+                "Firebase-এ এই package দিয়ে app register করে নতুন google-services.json বসান।")
+    }
+} else {
+    logger.warn("⚠️ app/google-services.json নেই — Push Notification বন্ধ থাকবে (app/README-google-services.txt দেখুন)।")
+}
+
+// resValue-তে বসানো টেক্সট যেন aapt/XML ভাঙতে না পারে (', ", &, <, শুরুর @ বা ?)
+def xmlText = { Object v ->
+    String t = v.toString()
+    t = t.replace('&', '&amp;').replace('<', '&lt;').replace("'", "\\'").replace('"', '\\"')
+    if (t.startsWith('@') || t.startsWith('?')) { t = '\\' + t }
+    return t
+}
+
+android {
+    namespace 'com.rinagift.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId cfgAppId
+        minSdk 26
+        targetSdk 34
+        // MUST match "current_app_version" in Admin Panel -> App Settings
+        // so Force Update works correctly.
+        versionCode cfgVersionCode
+        versionName cfgVersionName
+
+        resValue "string", "app_name", xmlText(cfgAppDisplayName)
+        resValue "string", "admin_base_url", xmlText(cfgAdminBaseUrl)
+        // App Shortcuts (res/xml/shortcuts.xml) এই package-এ ইন্টেন্ট পাঠায় — ভিন্ন applicationId দিলেও ঠিক থাকে
+        resValue "string", "app_id", cfgAppId
+        resValue "color", "primary", cfgPrimaryColor
+        resValue "color", "primary_dark", cfgPrimaryDark
+
+        manifestPlaceholders = [websiteHost: cfgWebsiteHost]
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            // debug APK can be installed directly (sideload) without Play Store
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+    buildFeatures {
+        viewBinding false
+        buildConfig true
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+    implementation 'androidx.webkit:webkit:1.11.0'
+
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation 'com.google.firebase:firebase-messaging'
+
+    // Smart login: Phone Number Hint + biometric-gated secure storage
+    implementation 'com.google.android.gms:play-services-auth:21.2.0'
+    implementation 'androidx.biometric:biometric:1.1.0'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    // Seamless background updates (Play Store installs only)
+    implementation 'com.google.android.play:app-update-ktx:2.1.0'
+
+    // Marketing attribution: which campaign/link caused the install
+    implementation 'com.android.installreferrer:installreferrer:2.2'
+
+    // Location-based alerts (geofencing)
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
+}

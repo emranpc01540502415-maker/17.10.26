@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Custom popup card for in-app notifications.
+
+  NOTE: intentionally built with ONLY plain Android framework
+  attributes (android:background / android:elevation /
+  android:clipToOutline) instead of com.google.android.material's
+  MaterialCardView (app:cardCornerRadius / app:cardElevation /
+  app:cardBackgroundColor). Those two are functionally identical
+  for our purposes, but the MaterialCardView attrs depend on the
+  androidx.cardview resource-linking working correctly in the build
+  environment, which failed during the GitHub Actions build
+  (AAPT: attribute res-auto:cardCornerRadius/cardElevation/
+  cardBackgroundColor not found). Native android: attributes need
+  no external library resources at all, so this can never fail to
+  resolve, regardless of build environment.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="28dp">
+
+    <LinearLayout
+        android:id="@+id/popupCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/bg_popup_card"
+        android:clipToOutline="true"
+        android:elevation="12dp"
+        android:alpha="0"
+        android:scaleX="0.9"
+        android:scaleY="0.9">
+
+        <!-- Image banner / gradient header -->
+        <FrameLayout
+            android:id="@+id/popupImageFrame"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:background="@drawable/bg_popup_header_gradient">
+
+            <ImageView
+                android:id="@+id/popupImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                android:contentDescription="@null" />
+
+            <TextView
+                android:id="@+id/popupImageEmoji"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="🎁"
+                android:textSize="44sp" />
+
+            <ImageButton
+                android:id="@+id/popupCloseButton"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="top|end"
+                android:layout_margin="10dp"
+                android:background="@drawable/bg_popup_close_circle"
+                android:src="@drawable/ic_popup_close"
+                android:padding="6dp"
+                android:scaleType="fitCenter"
+                android:contentDescription="বন্ধ করুন" />
+        </FrameLayout>
+
+        <!-- Text content -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:id="@+id/popupTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_dark"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:lineSpacingExtra="2dp"
+                tools:text="বিশেষ অফার!" />
+
+            <TextView
+                android:id="@+id/popupBody"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="#6E6689"
+                android:textSize="14sp"
+                android:lineSpacingExtra="3dp"
+                android:maxLines="6"
+                android:ellipsize="end"
+                tools:text="আজকের জন্য বিশেষ ছাড় — এখনই দেখে নিন।" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/popupDismissButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_popup_button_secondary"
+                    android:gravity="center"
+                    android:padding="13dp"
+                    android:text="বন্ধ করুন"
+                    android:textColor="@color/text_dark"
+                    android:textStyle="bold"
+                    android:textSize="13sp"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <TextView
+                    android:id="@+id/popupViewButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.4"
+                    android:background="@drawable/bg_popup_button_primary"
+                    android:gravity="center"
+                    android:padding="13dp"
+                    android:text="এখনই দেখুন"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:textSize="13sp"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

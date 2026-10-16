@@ -1,0 +1,201 @@
+name: Build Android APK
+
+# শুধু ম্যানুয়ালি চলে — GitHub-এর "Actions" ট্যাব → "Build Android APK" → "Run workflow"।
+# (commit/upload করলে নিজে থেকে চলে না।)
+
+on:
+  workflow_dispatch:
+    inputs:
+      admin_base_url:
+        description: 'Admin Panel-এর URL (শেষে / দেবেন না)'
+        required: true
+        default: 'https://rinagift.shop/amp'
+      app_name:
+        description: 'অ্যাপের নাম (ফোনে যেভাবে দেখাবে)'
+        required: false
+        default: 'Rina Gift Shop'
+      application_id:
+        description: 'Package name (google-services.json-এর package_name-এর সাথে মিলতে হবে)'
+        required: false
+        default: 'com.rinagift.app'
+      primary_color:
+        description: 'থিম কালার (hex, যেমন #8B7FD6)'
+        required: false
+        default: '#8B7FD6'
+      primary_color_dark:
+        description: 'গাঢ় থিম কালার (status bar)'
+        required: false
+        default: '#6F62C9'
+      version_code:
+        description: 'Version code (সংখ্যা — Admin Panel-এর current_app_version-এর সাথে মেলান)'
+        required: false
+        default: '1'
+      version_name:
+        description: 'Version name (যেমন 1.0)'
+        required: false
+        default: '1.0'
+      website_host:
+        description: 'ওয়েবসাইটের ডোমেইন (https:// ছাড়া, Deep Link-এর জন্য)'
+        required: false
+        default: 'rinagift.shop'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # ubuntu-latest অক্টোবর ২০২৬-এ Ubuntu 26-এ সরছে — স্থিতিশীল রাখতে ভার্সন পিন করা
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      # ইনপুট কখনো সরাসরি শেল কমান্ডে বসানো হয় না — env দিয়ে নেওয়া হয় (script-injection ঠেকাতে)
+      IN_ADMIN_BASE_URL: ${{ github.event.inputs.admin_base_url || 'https://rinagift.shop/amp' }}
+      IN_APP_NAME: ${{ github.event.inputs.app_name || 'Rina Gift Shop' }}
+      IN_APP_ID: ${{ github.event.inputs.application_id || 'com.rinagift.app' }}
+      IN_COLOR: ${{ github.event.inputs.primary_color || '#8B7FD6' }}
+      IN_COLOR_DARK: ${{ github.event.inputs.primary_color_dark || '#6F62C9' }}
+      IN_VERSION_CODE: ${{ github.event.inputs.version_code || '1' }}
+      IN_VERSION_NAME: ${{ github.event.inputs.version_name || '1.0' }}
+      IN_WEBSITE_HOST: ${{ github.event.inputs.website_host || 'rinagift.shop' }}
+      GRADLE_VERSION: '8.7'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Locate Android project and validate inputs
+        id: prep
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # ---- ১) Android প্রজেক্ট কোথায় আছে (রিপোর "root"-এ অথবা android-app/ ফোল্ডারে) ----
+          dir=""
+          if [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
+            dir="."
+          elif [ -f android-app/settings.gradle ]; then
+            dir="android-app"
+          else
+            found="$(find . -maxdepth 3 -name settings.gradle -not -path './.git/*' | head -n 1 || true)"
+            if [ -n "$found" ]; then dir="$(dirname "$found")"; fi
+          fi
+          if [ -z "$dir" ] || [ ! -f "$dir/app/build.gradle" ]; then
+            echo "::error title=Android প্রজেক্ট পাওয়া যায়নি::রিপোজিটরির root-এ settings.gradle, build.gradle এবং app/ ফোল্ডার থাকতে হবে (README.txt-এর ধাপ ৩ দেখুন)।"
+            echo "Repository tree (depth 2):"; find . -maxdepth 2 -not -path './.git*' | sort | head -60
+            exit 1
+          fi
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "Android project directory: $dir"
+
+          # ---- ২) ইনপুট যাচাই ও পরিষ্কার (ভুল মান পরে রহস্যময় Gradle error দেয়) ----
+          url="${IN_ADMIN_BASE_URL%/}"
+          case "$url" in https://*) ;; *) echo "::error title=ভুল Admin URL::Admin Panel URL অবশ্যই https:// দিয়ে শুরু হতে হবে (পেয়েছি: $url)"; exit 1;; esac
+          host="${IN_WEBSITE_HOST#https://}"; host="${host#http://}"; host="${host%%/*}"
+          if ! echo "$host" | grep -Eq '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'; then
+            echo "::error title=ভুল ডোমেইন::website_host শুধু ডোমেইন হবে (যেমন rinagift.shop), পেয়েছি: $IN_WEBSITE_HOST"; exit 1
+          fi
+          if ! echo "$IN_APP_ID" | grep -Eq '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$'; then
+            echo "::error title=ভুল Package name::application_id সঠিক নয় (যেমন com.rinagift.app), পেয়েছি: $IN_APP_ID"; exit 1
+          fi
+          for c in "$IN_COLOR" "$IN_COLOR_DARK"; do
+            if ! echo "$c" | grep -Eq '^#[0-9A-Fa-f]{6}$'; then
+              echo "::error title=ভুল কালার::কালার #RRGGBB ফরম্যাটে দিন (যেমন #8B7FD6), পেয়েছি: $c"; exit 1
+            fi
+          done
+          if ! echo "$IN_VERSION_CODE" | grep -Eq '^[0-9]{1,9}$'; then
+            echo "::error title=ভুল Version code::version_code শুধু সংখ্যা হবে, পেয়েছি: $IN_VERSION_CODE"; exit 1
+          fi
+          {
+            echo "ADMIN_BASE_URL=$url"
+            echo "WEBSITE_HOST=$host"
+          } >> "$GITHUB_ENV"
+
+          # ---- ৩) google-services.json যাচাই (শুধু সতর্কতা — না থাকলেও build হয়) ----
+          gs="$dir/app/google-services.json"
+          if [ -f "$gs" ]; then
+            if grep -q "\"package_name\"[[:space:]]*:[[:space:]]*\"$IN_APP_ID\"" "$gs"; then
+              echo "google-services.json: package '$IN_APP_ID' মিলেছে ✔ (Push Notification চালু থাকবে)"
+            else
+              echo "::warning title=google-services.json মেলেনি::'$IN_APP_ID' package-এর জন্য google-services.json-এ কোনো app নেই। Build হবে, কিন্তু Push Notification বন্ধ থাকবে। Firebase-এ এই package দিয়ে app register করে নতুন ফাইল বসান।"
+            fi
+          else
+            echo "::warning title=google-services.json নেই::Build হবে, কিন্তু Push Notification বন্ধ থাকবে (app/README-google-services.txt দেখুন)।"
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Gradle ${{ env.GRADLE_VERSION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # প্রজেক্টে Gradle wrapper নেই; AGP 8.5-এর জন্য ঠিক 8.x লাগে (runner-এর ডিফল্ট Gradle ভিন্ন ভার্সন হতে পারে)
+          for i in 1 2 3; do
+            curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip && break
+            echo "Gradle download failed (attempt $i) — retrying…"; sleep 5
+          done
+          unzip -q /tmp/gradle.zip -d "$HOME"
+          echo "$HOME/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -uo pipefail
+          # GitHub runner-এ Android SDK আগে থেকেই আছে (আলাদা setup-android action লাগে না)
+          sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk" >> "$GITHUB_ENV"
+          echo "SDK: $sdk"; ls "$sdk" || true
+          ls "$sdk/platforms" 2>/dev/null || true
+          # লাইসেন্স গ্রহণ (না থাকলে AGP প্ল্যাটফর্ম ডাউনলোড করতে পারে না)
+          if [ -x "$sdk/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+            "$sdk/cmdline-tools/latest/bin/sdkmanager" "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1 || true
+          fi
+          java -version 2>&1; gradle --version | head -n 12
+
+      - name: Build Debug APK
+        working-directory: ${{ steps.prep.outputs.dir }}
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace \
+            -PadminBaseUrl="$ADMIN_BASE_URL" \
+            -PappDisplayName="$IN_APP_NAME" \
+            -PappId="$IN_APP_ID" \
+            -PprimaryColor="$IN_COLOR" \
+            -PprimaryColorDark="$IN_COLOR_DARK" \
+            -PappVersionCode="$IN_VERSION_CODE" \
+            -PappVersionName="$IN_VERSION_NAME" \
+            -PwebsiteHost="$WEBSITE_HOST" 2>&1 | tee build.log
+
+      - name: Show the real error (Summary পেজের Annotations-এ দেখাবে)
+        if: failure()
+        working-directory: ${{ steps.prep.outputs.dir }}
+        shell: bash
+        run: |
+          [ -f build.log ] || { echo "::error::Build শুরুর আগেই ব্যর্থ — উপরের ধাপগুলোর লাল লাইন দেখুন"; exit 0; }
+          grep -E '^e: ' build.log | head -n 15 | while IFS= read -r line; do echo "::error title=Kotlin compile error::${line:0:400}"; done
+          sed -n '/\* What went wrong:/,/\* Try:/p' build.log | head -n 14 | sed 's/^/::error title=Gradle::/' | head -n 14
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: ${{ steps.prep.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: |
+            ${{ steps.prep.outputs.dir }}/build.log
+            ${{ steps.prep.outputs.dir }}/app/build/reports/**
+          if-no-files-found: ignore
+          retention-days: 7
